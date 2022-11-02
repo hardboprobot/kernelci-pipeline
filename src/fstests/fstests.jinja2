@@ -9,6 +9,7 @@ GCE               = '{{True if gce is not none else NONE}}'
 GCE_PROJECT       = '{{gce_project if gce_project is not none else NONE}}'
 GCE_ZONE          = '{{gce_zone if gce_zone is not none else NONE}}'
 GS_BUCKET         = '{{gs_bucket if gs_bucket is not none else NONE}}'
+MAX_SHARDS        = '{{max_shards if max_shards is not none else NONE}}'
 # TBD: For production, set the appropriate njobs number by default
 NJOBS             = '{{njobs if njobs is not none else 1}}'
 OUTPUT            = '{{output if output is not none else NONE}}'
@@ -288,7 +289,7 @@ class GceXfstests(Xfstests):
                'bigalloc_1k'   : 'ext4/results-bigalloc_1k',
     }
 
-    def __init__(self):
+    def __init__(self, max_shards=None):
         # List of dicts. Each list element represents a shard (a
         # distinct VM instance). The dict keys are:
         #  - 'id': a unique numeric suffix for each shard in a group, starting from 0
@@ -296,6 +297,7 @@ class GceXfstests(Xfstests):
         #  - 'results_tarball': GS bucket path of the results tarball
         #  - 'unpacked_results': local path where the results are unpacked
         #  - 'thread': thread that polls the VM
+        self.max_shards = max_shards
         self.shards = []
         self.kernelimg = ''
         # NOTE: this script will most likely be launched as a subprocess
@@ -479,7 +481,7 @@ class GceXfstests(Xfstests):
         if not quotas:
             print("Error retrieving GCE quotas")
             return False
-        max_shards = int(min(quotas['CPUS'],
+        num_shards = int(min(quotas['CPUS'],
                              quotas['IN_USE_ADDRESSES'],
                              quotas['SSD_TOTAL_GB']))
 
@@ -489,14 +491,16 @@ class GceXfstests(Xfstests):
         # and
         # https://github.com/tytso/xfstests-bld/blob/34e81de235cf380d30082779aef5e6f50b9b9548/run-fstests/config.gce#L36
         cpus = self._get_machtype_cpus(self.gce_env['GCE_MACHTYPE'])
-        max_shards = int(min(quotas['IN_USE_ADDRESSES'],
+        num_shards = int(min(quotas['IN_USE_ADDRESSES'],
                              quotas['CPUS'] / cpus,
                              quotas['SSD_TOTAL_GB'] / 100))
-        for n in range(0, max_shards):
+        for n in range(0, num_shards):
             self.shards.append({'id': n})
-        if max_shards < 1:
+        if num_shards < 1:
             print("GCE quota exceeded, can't start a VM")
             return False
+        if self.max_shards != None and self.max_shards < num_shards:
+            num_shards = self.max_shards
 
         # Distribute the test configs into shards. If no test configs
         # are specified, consider all available configs
@@ -504,14 +508,14 @@ class GceXfstests(Xfstests):
             cfgs = self.configs.keys()
         else:
             cfgs = re.split(r',\s*', testcfg)
-        cfgs_per_shard = math.ceil(len(cfgs) / max_shards)
+        cfgs_per_shard = math.ceil(len(cfgs) / num_shards)
         shard_idx = 0
         for c in cfgs:
             if 'configs' in self.shards[shard_idx]:
                 self.shards[shard_idx]['configs'].append(c)
             else:
                 self.shards[shard_idx]['configs'] = [c]
-            shard_idx = (shard_idx + 1) % max_shards
+            shard_idx = (shard_idx + 1) % num_shards
 
         self.kernelimg = self._upload_kernel(kdir)
         if not self.kernelimg:
@@ -623,7 +627,10 @@ class Job(BaseJob):
              return fail_results
 
         if GCE:
-            test = GceXfstests()
+            max_shards = None
+            if MAX_SHARDS:
+                max_shards = int(MAX_SHARDS)
+            test = GceXfstests(max_shards)
         else:
             test = KvmXfstests()
 
