@@ -1,0 +1,30 @@
+
+# Settings preset definition: default preset
+default:
+  # 'tests' and 'kbuilds' blocks accepted
+
+  # List of test queries
+  # tests:
+  #   # Query by group, name, arch and list of repos
+  #   - group__re: baseline
+  #     name: dmesg
+  #     arch: arm64
+  #     repos:
+  #       - tree: stable-rc
+  #         branch: linux-5.4.y
+  #       - tree: stable-rc
+  #         branch: linux-5.15.y
+  #       - tree: mytree
+  #   # Query by name
+  #   - name_re: mytest
+
+  # List of kbuild queries
+  # kbuilds:
+  #   - name__re: kbuild
+  #     result: fail
+    # Query by repo parameters
+      # repos:
+      #   - tree: stable-rc
+
+  regressions:
+    #- group__re: baseline
