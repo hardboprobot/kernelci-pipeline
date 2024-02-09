@@ -21,6 +21,42 @@ services:
       - './src:/home/kernelci/pipeline'
       - './config:/home/kernelci/config'
 
+
+  results_checker:
+    container_name: 'kernelci-pipeline-results-checker'
+    image: 'kernelci/staging-kernelci'
+    env_file: ['.env']
+    stop_signal: 'SIGINT'
+    entrypoint:
+      - './pipeline/results_checker.py'
+      - '--settings=${KCI_SETTINGS:-/home/kernelci/config/kernelci.toml}'
+      - 'run'
+      - '--config=${SETTINGS:-/home/kernelci/config/results_checker.yaml}'
+    volumes:
+      - './src:/home/kernelci/pipeline'
+      - './config:/home/kernelci/config'
+      - './data/output:/home/kernelci/data/output'
+      - './kernelci-core-bind/kernelci:/usr/local/lib/python3.11/site-packages/kernelci'
+      - './kernelci-core-bind/config:/etc/kernelci'
+
+
+  console:
+    container_name: 'kernelci-pipeline-console'
+    image: 'kernelci/staging-kernelci'
+    env_file: ['.env']
+    stop_signal: 'SIGINT'
+    stdin_open: true
+    tty: true
+    entrypoint:
+      - 'bash'
+    volumes:
+      - './src:/home/kernelci/pipeline'
+      - './config:/home/kernelci/config'
+      - './data/output:/home/kernelci/data/output'
+      - './kernelci-core-bind/kernelci:/usr/local/lib/python3.11/site-packages/kernelci'
+      - './kernelci-core-bind/config:/etc/kernelci'
+
+
   scheduler: &scheduler
     container_name: 'kernelci-pipeline-scheduler'
     image: 'kernelci/staging-kernelci'
